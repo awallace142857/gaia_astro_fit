@@ -476,7 +476,7 @@ def gaia_query(source_id):
 	all_keys.extend(['ra_dec_corr','ra_parallax_corr','ra_pmra_corr','ra_pmdec_corr','dec_parallax_corr','dec_pmra_corr','dec_pmdec_corr','parallax_pmra_corr','parallax_pmdec_corr','pmra_pmdec_corr'])
 	params = {}
 	for key in all_keys:
-		params[key] = float(r[key][el])
+		params[key] = float(result_table[key][el])
 	(t_obs,scan_angle,plx_factor) = find_obs(params['ra'],params['dec'])
 	return (params,t_obs,scan_angle,plx_factor)
 
