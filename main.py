@@ -470,9 +470,9 @@ def gaia_query(source_id):
 
 def get_fitted_params(samples):
     if 'e' in samples.constrained_param_names:
-    	strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
+        strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
     else:
-    	strings = ['m1','m2','P','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
+        strings = ['m1','m2','P','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
     all_params = []
     if type(samples)==list:
         for ii in range(len(strings)):
