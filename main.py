@@ -461,31 +461,12 @@ def best_chain(n_samples,n_chains,A,B,F,G,A_obs,B_obs,F_obs,G_obs):
 
 def gaia_query(source_id):
 	name = 'Gaia DR3 '+source_id
-	result_table = Simbad.query_object(name)
-	ra = result_table['RA'].tolist()[0]
-	dec = result_table['DEC'].tolist()[0]
-	counter = 0
-	ra_units = ['h','m','s']
-	new_ra = ''
-	for ii in range(len(ra)):
-		if ra[ii]==' ':
-			new_ra+=ra_units[counter]
-			counter+=1
-		else:
-			new_ra+=ra[ii]
-	counter = 0
-	dec_units = ['d','m','s']
-	new_dec = ''
-	for ii in range(len(dec)):
-		if dec[ii]==' ':
-			new_dec+=dec_units[counter]
-			counter+=1
-		else:
-			new_dec+=dec[ii]
-	coords = new_ra+' '+new_dec
-	r = Gaia.query_object_async(coordinate=coords,radius='10 arcsecond')
-	all_ids = r['DESIGNATION'].tolist()
+	#result_table = Simbad.query_object(name)
+	result_table = Gaia.query_object(name,radius='10 arcsecond')
+	all_ids = result_table['DESIGNATION'].tolist()
 	el = all_ids.index(name)
+	ra = result_table['ra'].tolist()[el]
+	dec = result_table['dec'].tolist()[el]
 	all_keys = ['ra','dec','parallax','pmra','pmdec']
 	nKeys = len(all_keys)
 	for ii in range(nKeys):
