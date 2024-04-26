@@ -35,18 +35,6 @@ def find_obs(ra,dec):
 		g = x*np.cos(ra*np.pi/180)*np.sin(dec*np.pi/180)+y*np.sin(ra*np.pi/180)*np.sin(dec*np.pi/180)-z*np.cos(dec*np.pi/180)
 		p_factors[ii] = f*np.sin(angs[ii])+g*np.cos(angs[ii])
 	return (ts,angs,p_factors)
-
-def get_fitted_params(samples):
-    strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
-    all_params = {}
-    for ii in range(len(strings)):
-        if strings[ii]=='cos_inclination':
-            all_params[strings[ii]] = np.arccos(samples.get(strings[ii])[0])*180/np.pi
-        elif 'mega' in strings[ii]:
-            all_params[strings[ii]] = (samples.get(strings[ii])[0]*180/np.pi)%360
-        else:
-            all_params[strings[ii]] = samples.get(strings[ii])[0]
-    return all_params
     
 def convert_julian_date(j_date):
 	return j_date/365.25-4712
@@ -481,7 +469,10 @@ def gaia_query(source_id):
 	return (params,t_obs,scan_angle,plx_factor)
 
 def get_fitted_params(samples):
-    strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
+    if 'e' in samples.constrained_param_names:
+    	strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
+    else:
+    	strings = ['m1','m2','P','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
     all_params = []
     if type(samples)==list:
         for ii in range(len(strings)):
