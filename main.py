@@ -503,6 +503,8 @@ def get_fitted_params(samples):
 def create_sample_dict(all_params):
     samples_dict = {}
     labels = ['m1','m2','P','e','inc','Omega','omega','t_p','ra_off','dec_off','parallax','pmra','pmdec','ruwe']
+    if len(all_params)<len(labels):
+    	labels = ['m1','m2','P','inc','Omega','omega','t_p','ra_off','dec_off','parallax','pmra','pmdec','ruwe']
     for ii in range(len(all_params)):
         samples_dict[labels[ii]] = all_params[ii]
     return samples_dict
