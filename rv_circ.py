@@ -678,7 +678,6 @@ data {
     real m1_mean;
     real g_mag;
     real mag_err;
-    int bright;
     int T2;
     vector[T2] rv_vals;
     vector[T2] rv_t;
@@ -689,10 +688,10 @@ transformed data {
     vector[T] cos_scan_angle = cos(scan_angle);
 }
 parameters {
-    real<lower=0.2, upper=3> m1; // solar masses
+    real<lower=0.08, upper=3> m1; // solar masses
     real<lower=0.002, upper=m1> m2; // solar masses
     real<lower=0.1, upper=40> P;
-    real<lower=-3*P/4, upper=3*P/4> t_peri;
+    real initial_phase;
     real<lower=-1, upper=+1> cos_inclination;
     real Omega;
     real omega;
@@ -707,8 +706,8 @@ transformed parameters {
 	real q = m2/m1;
 	real dist = 1000./plx_real;
 	real a = 1000 * pow((m1+m2)*pow(P, 2), 1./3) / dist;
-	real l = bright*pow(q,4);
-	//real t_peri = -initial_phase * P / (2*pi());
+	real l = pow(q,4);
+	real t_peri = -initial_phase * P / (2*pi());
 }
 model {
     m1 ~ normal(m1_mean, 0.8);
@@ -791,7 +790,7 @@ generated quantities {
     }
 }"""
 import stan
-def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_angle,plx_factor,ast_error,im_data,rv_data,dark):
+def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_angle,plx_factor,ast_error,im_data,rv_data):
 	global program_code
 	[ra,dec,plx_obs,pmra_obs,pmdec_obs] = gaia_params
 	[ra_err,dec_err,plx_err,pmra_err,pmdec_err] = gaia_errs
@@ -810,12 +809,8 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 	gaia_mat_AL = gaia_matrix_AL(t_obs-2016,scan_angle,ra,dec)
 	inv_gaia = gaia_inverse_AL(t_obs-2016,scan_angle,ra,dec)
 	abs_mag = g_mag-5*np.log10(100./plx_obs)
-	m1_mean = -0.145*abs_mag+1.64
+	m1_mean = 10**((4.83-abs_mag)/10)
 	ast_noise = ast_error*np.random.randn(len(t_obs))
-	if dark:
-		bright = 0
-	else:
-		bright = 1
 	rv_errs = 0.01*np.ones(rv_data.shape[0])
 	data = {
 		"ra": ra, 
@@ -838,7 +833,6 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 		"m1_mean": m1_mean,
 		"g_mag": g_mag,
 		"mag_err": 0.05,
-		"bright": bright,
 		"rv_vals": rv_data[:,1],
 		"rv_t": rv_data[:,0]-2016,
 		"T2": rv_data.shape[0],

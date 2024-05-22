@@ -620,11 +620,6 @@ program_code = """functions {
     	real mag = mag_sun-2.5*log10(flux_ratio)+5*log10(100./parallax);
     	return mag;
     }
-    real mag_from_mass_single(real mass, real parallax) {
-    	real abs_mag = 4.83-10*log10(mass);
-    	real mag = abs_mag+5*log10(100./parallax);
-    	return mag;
-    }
     real excess_noise(int T, vector R, real al_err, vector w) {
     	real y=0;
     	real nu=0;
@@ -719,15 +714,20 @@ data {
     real m1_mean;
     real g_mag;
     real mag_err;
-
+    int bright;
+    int T2;
+    vector[T2] t_image;
+    vector[T2] image_errs;
+    vector[T2] x_obs;
+    vector[T2] y_obs;
 }
 transformed data {  
     vector[T] sin_scan_angle = sin(scan_angle);
     vector[T] cos_scan_angle = cos(scan_angle);
 }
 parameters {
-    real<lower=0.08, upper=3> m1; // solar masses
-    real<lower=0.002, upper=m2_max> m2; // solar masses
+    //real<lower=0.08, upper=3> m1; // solar masses
+    real<lower=0.002, upper=m1_mean> m2; // solar masses
     real<lower=0.1, upper=40> P;
     real<lower=0.0, upper=0.8> e;
     real initial_phase;
@@ -742,14 +742,15 @@ parameters {
     
 }
 transformed parameters {
+	real m1 = m1_mean;
 	real q = m2/m1;
 	real dist = 1000./plx_real;
 	real a = 1000 * pow((m1+m2)*pow(P, 2), 1./3) / dist;
-	real l = pow(q,4);
+	real l = 0;
 	real t_peri = -initial_phase * P / (2*pi());
 }
 model {
-    m1 ~ normal(m1_mean, 0.2);
+    //m1 ~ normal(m1_mean, 0.8);
     {
         real a0 = a*(q/(1+q)-l/(1+l)); // l = 0 for a dark companion
         real a1 = a*(q/(1+q));
@@ -760,12 +761,15 @@ model {
         vector[5] obs_vals = gaia_params(T, x_AL, al_err, gaia_mat_AL);
         vector[5] y = [0,0,parallax,pmra,pmdec]';
         y ~ multi_normal(obs_vals,covar_matrix);
+        vector[T2] comp_pos[2] = projected_position_2d(T2, t_image, a, P, e, cos_inclination, Omega, omega, t_peri);
+        vector[T2] pos_x = -comp_pos[1];
+        vector[T2] pos_y = -comp_pos[2];
+        x_obs ~ multi_normal(pos_x,diag_matrix(image_errs.*image_errs));
+        y_obs ~ multi_normal(pos_y,diag_matrix(image_errs.*image_errs));
         real ruwe = sqrt(sum(pow(gaia_mat_AL*obs_vals-x_AL,2)/(pow(al_err,2)*(T-5))));//reduced_unit_weight_error(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri, sin_scan_angle, cos_scan_angle, al_err, ACAT);
         ruwe_obs ~ normal(ruwe, ruwe_err);
         //real mag_sim = mag_from_mass(m1,bright*m2,plx_real);
         //g_mag ~ normal(mag_sim, mag_err);
-        real mag_sim = mag_from_mass_single(m1,plx_real);
-        g_mag ~ normal(mag_sim, mag_err);
     }
 }
 
@@ -850,6 +854,7 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 	abs_mag = g_mag-5*np.log10(100./plx_obs)
 	m1_mean = 10**((4.83-abs_mag)/10)
 	ast_noise = ast_error*np.random.randn(len(t_obs))
+	image_err = 10*np.ones(im_data.shape[0])
 	data = {
 		"ra": ra, 
 		"dec": dec, 
@@ -871,6 +876,11 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 		"m1_mean": m1_mean,
 		"g_mag": g_mag,
 		"mag_err": 0.05,
+		"T2": im_data.shape[0],
+		"t_image": im_data[:,0]-2016,
+		"x_obs": im_data[:,1],
+		"y_obs": im_data[:,2],
+		"image_errs": image_err,
 	}
 	model = stan.build(program_code, data=data)
 	return model

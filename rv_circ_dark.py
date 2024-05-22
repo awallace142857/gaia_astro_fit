@@ -456,7 +456,7 @@ program_code = """functions {
     real photocenter_scalar(real q, real l) {
         return abs(q - l)/((1 + l) * (1 + q));
     }    
-    vector true_anomaly_calc(int T, vector t, real P, real eccentricity, real t_peri) {
+    vector true_anomaly_calc(int T, vector t, real P, real t_peri) {
         /* 
         Calculate the true anomaly.
         
@@ -465,62 +465,28 @@ program_code = """functions {
         :param t:
             The observed times [year].
         :param P:
-            Orbital period [year].            
-        :param eccentricity:
-            Orbital eccentricity.        
+            Orbital period [year].                
         :param t_peri:
             Periastron time [year].
         */
-        int max_iter = 15;
-         vector[T] phase = 2 * pi() * ((t - t_peri) / P);
-        vector[T] eta = (
-            phase 
-            + eccentricity * sin(phase)
-            + pow(eccentricity, 2) * sin(phase) .* cos(phase)
-            + 0.5 * pow(eccentricity, 3) * sin(phase) .* (3 * pow(cos(phase), 2) - 1)
-        );
-        for (n in 1:max_iter) {
-            vector[T] f = eta - eccentricity * sin(eta) - phase;
-            vector[T] d_f = 1 - eccentricity * cos(eta);
-            vector[T] delta_eta = (-f .* d_f) ./ (d_f .* d_f - 0.5 * eccentricity * f .* sin(eta));
-            eta = eta + delta_eta;
-            if (max(abs(delta_eta)) < 1e-5) break;
-        }
-        real beta = eccentricity/(1+sqrt(1-pow(eccentricity,2)));
-        //vector[T] true_an = acos((cos(eta)-eccentricity)./(1-eccentricity*cos(eta)));
-        vector[T] true_an = eta+2*atan((beta*sin(eta)./(1-beta*cos(eta))));
-        return true_an;
+        vector[T] phase = 2 * pi() * ((t - t_peri) / P);
+        return phase;
     }
-    vector radial_velocity(int T, vector t, real a, real q, real l, real P, real eccentricity,real cos_inclination, real Omega_, real omega_,real t_peri) {
-    	vector[T] f = true_anomaly_calc(T, t, P, eccentricity, t_peri);
-    	vector[T] r = position(f, a, eccentricity);
-    	vector[T] x = r .* cos(f);
-        vector[T] y = r .* sin(f);
+    vector radial_velocity(int T, vector t, real a, real q, real l, real P, real cos_inclination, real Omega_, real omega_,real t_peri) {
+    	vector[T] f = true_anomaly_calc(T, t, P, t_peri);
+    	vector[T] x = a .* cos(f);
+        vector[T] y = a .* sin(f);
         vector[T] z_new = x*sqrt(1-pow(cos_inclination,2))*sin(omega_) + y*sqrt(1-pow(cos_inclination,2))*cos(omega_);
         vector[T] z0 = z_new.*photocenter_scalar(q, l);
         real t_diff = 0.001;
-        f = true_anomaly_calc(T, t+t_diff, P, eccentricity, t_peri);
-    	r = position(f, a, eccentricity);
-    	x = r .* cos(f);
-        y = r .* sin(f);
+        f = true_anomaly_calc(T, t+t_diff, P, t_peri);
+    	x = a .* cos(f);
+        y = a .* sin(f);
         z_new = x*sqrt(1-pow(cos_inclination,2))*sin(omega_) + y*sqrt(1-pow(cos_inclination,2))*cos(omega_);
         vector[T] z1 = z_new.*photocenter_scalar(q, l);
         real rv_scalar = 1.496*pow(10,8)/(365.25*24*3600);
         vector[T] rv = rv_scalar*(z1-z0)./t_diff;
         return rv;
-    }
-    vector position(vector true_anomaly, real a, real eccentricity) {
-        /*
-        Calculate the radial position of a component.
-
-        :param true_anomaly:
-            The true anomaly [radians].
-        :param a:
-            The semi-major axis [arcsec].
-        :param eccentricity:
-            The orbital eccentricity.
-        */
-        return a * (1 - pow(eccentricity, 2))/(1 + eccentricity * cos(true_anomaly));
     }
     vector[] position_2d(int T, vector true_anomaly, vector rad, real cos_inclination, real Omega_, real omega_) {
         /*
@@ -546,7 +512,7 @@ program_code = """functions {
         //vector[T] z_new = x*sin(inclination)*sin(omega_) + y*sin(inclination)*cos(omega_);
         return {x_new, y_new};
     }
-    vector[] projected_position_2d(int T, vector t, real a, real P, real eccentricity, real cos_inclination, real Omega_, real omega_, real t_peri) {
+    vector[] projected_position_2d(int T, vector t, real a, real P, real cos_inclination, real Omega_, real omega_, real t_peri) {
         /*
         Calculate the projected position in the plane of the sky.
 
@@ -556,8 +522,6 @@ program_code = """functions {
             The semi-major axis [arcsec].
         :param P:
             Orbital period [year].
-        :param eccentricity:
-            Orbital eccentricity.
         :param cos_inclination:
             The cosine of the inclination angle.
         :param Omega_:
@@ -567,25 +531,25 @@ program_code = """functions {
         :param t_peri:
             Periastron time [year].
         */
-        vector[T] true_anomaly = true_anomaly_calc(T, t, P, eccentricity, t_peri);
-        vector[T] rad = position(true_anomaly, a, eccentricity);
+        vector[T] true_anomaly = true_anomaly_calc(T, t, P, t_peri);
         vector[T] xyz[2];
+        vector[T] rad = a.*true_anomaly./true_anomaly;
         xyz = position_2d(T, true_anomaly, rad, cos_inclination, Omega_, omega_);
         return {xyz[2], xyz[1]};
     }
-    real[] initial_position(real a, real P, real q, real l, real eccentricity, real cos_inclination, real Omega_, real omega_, real t_peri) {
-        vector[1] xy[2] = projected_position_2d(1, rep_vector(0, 1), a, P, eccentricity, cos_inclination, Omega_, omega_, t_peri);
+    real[] initial_position(real a, real P, real q, real l, real cos_inclination, real Omega_, real omega_, real t_peri) {
+        vector[1] xy[2] = projected_position_2d(1, rep_vector(0, 1), a, P, cos_inclination, Omega_, omega_, t_peri);
         real s = photocenter_scalar(q, l);
         return {xy[1][1] * s, xy[2][1] * s};
     }
-    vector[] source_position(int T, vector t, real a, real P, real q, real l, real eccentricity, real cos_inclination, real Omega_, real omega_, real t_peri) {
-        vector[T] xy[2] = projected_position_2d(T, t, a, P, eccentricity, cos_inclination, Omega_, omega_, t_peri);
+    vector[] source_position(int T, vector t, real a, real P, real q, real l, real cos_inclination, real Omega_, real omega_, real t_peri) {
+        vector[T] xy[2] = projected_position_2d(T, t, a, P, cos_inclination, Omega_, omega_, t_peri);
         real s = photocenter_scalar(q, l);
         return {xy[1] * s, xy[2] * s};
     }    
-    vector[] system_pos(int T, vector t, vector gaia_ra_col, vector gaia_dec_col, real q, real l,real a, real P, real eccentricity, real cos_inclination, real Omega_, real omega_, real t_peri) {
-        real p0[2] = initial_position(a, P, q, l, eccentricity, cos_inclination, Omega_, omega_, t_peri);
-        vector[T] p1[2] = source_position(T, t, a, P, q, l, eccentricity, cos_inclination, Omega_, omega_, t_peri);
+    vector[] system_pos(int T, vector t, vector gaia_ra_col, vector gaia_dec_col, real q, real l,real a, real P, real cos_inclination, real Omega_, real omega_, real t_peri) {
+        real p0[2] = initial_position(a, P, q, l, cos_inclination, Omega_, omega_, t_peri);
+        vector[T] p1[2] = source_position(T, t, a, P, q, l, cos_inclination, Omega_, omega_, t_peri);
         vector[T] ra_diff_col = gaia_ra_col + (p1[1]);
         vector[T] dec_diff_col = gaia_dec_col + (p1[2]);
         return {ra_diff_col, dec_diff_col};
@@ -618,11 +582,6 @@ program_code = """functions {
     	real flux_ratio = (flux_from_mass(m1)+flux_from_mass(m2))/flux_from_mass(1.0);
     	real mag_sun = 4.83;
     	real mag = mag_sun-2.5*log10(flux_ratio)+5*log10(100./parallax);
-    	return mag;
-    }
-    real mag_from_mass_single(real mass, real parallax) {
-    	real abs_mag = 4.83-10*log10(mass);
-    	real mag = abs_mag+5*log10(100./parallax);
     	return mag;
     }
     real excess_noise(int T, vector R, real al_err, vector w) {
@@ -672,14 +631,14 @@ program_code = """functions {
     	params = C*gaia_mat'*W*x_AL;
     	return params;
     }
-    real reduced_unit_weight_error(int T, vector t, vector gaia_ra_col, vector gaia_dec_col, real q, real l, real a, real P, real eccentricity, real cos_inclination, real Omega_, real omega_, real t_peri, vector sin_scan_angle, vector cos_scan_angle, real al_err, matrix ACAT) {
+    real reduced_unit_weight_error(int T, vector t, vector gaia_ra_col, vector gaia_dec_col, real q, real l, real a, real P, real cos_inclination, real Omega_, real omega_, real t_peri, vector sin_scan_angle, vector cos_scan_angle, real al_err, matrix ACAT) {
         //real t_peri = -initial_phase * P / (2*pi());
-        vector[T] pos[2] = system_pos(T, t, gaia_ra_col, gaia_dec_col, q, l, a, P, eccentricity, cos_inclination, Omega_, omega_, t_peri);
+        vector[T] pos[2] = system_pos(T, t, gaia_ra_col, gaia_dec_col, q, l, a, P, cos_inclination, Omega_, omega_, t_peri);
         vector[T] al_pos = pos[1] .* sin_scan_angle + pos[2] .* cos_scan_angle;
         vector[T] R = (al_pos' - al_pos' * ACAT)';
         real ruwe = sqrt(sum(pow(R/al_err, 2)) / (T - 5));
         if (is_nan(ruwe)) {
-            print("q=", q, ";a=", a,";P=",P,";e=",eccentricity,";cosi=",cos_inclination,";Omega=",Omega_,";omega=",omega_);//,";phi0=",initial_phase);
+            print("q=", q, ";a=", a,";P=",P,";cosi=",cos_inclination,";Omega=",Omega_,";omega=",omega_);//,";phi0=",initial_phase);
         }
         return ruwe;
         return sqrt(sum(pow(R/al_err, 2)) / (T - 5));
@@ -719,17 +678,20 @@ data {
     real m1_mean;
     real g_mag;
     real mag_err;
-
+    int bright;
+    int T2;
+    vector[T2] rv_vals;
+    vector[T2] rv_t;
+    vector[T2] rv_errs;
 }
 transformed data {  
     vector[T] sin_scan_angle = sin(scan_angle);
     vector[T] cos_scan_angle = cos(scan_angle);
 }
 parameters {
-    real<lower=0.08, upper=3> m1; // solar masses
-    real<lower=0.002, upper=m2_max> m2; // solar masses
+    //real<lower=0.08, upper=3> m1; // solar masses
+    real<lower=0.002, upper=m1_mean> m2; // solar masses
     real<lower=0.1, upper=40> P;
-    real<lower=0.0, upper=0.8> e;
     real initial_phase;
     real<lower=-1, upper=+1> cos_inclination;
     real Omega;
@@ -742,30 +704,31 @@ parameters {
     
 }
 transformed parameters {
+	real m1 = m1_mean;
 	real q = m2/m1;
 	real dist = 1000./plx_real;
 	real a = 1000 * pow((m1+m2)*pow(P, 2), 1./3) / dist;
-	real l = pow(q,4);
+	real l = 0;
 	real t_peri = -initial_phase * P / (2*pi());
 }
 model {
-    m1 ~ normal(m1_mean, 0.2);
+    //m1 ~ normal(m1_mean, 0.8);
     {
         real a0 = a*(q/(1+q)-l/(1+l)); // l = 0 for a dark companion
         real a1 = a*(q/(1+q));
         vector[T] gaia_diffs[2] = gaia_pos(T, ra_real, dec_real, plx_real, pmra_real, pmdec_real, gaia_mat);
-        vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri);
+        vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, cos_inclination, Omega, omega, t_peri);
         vector[T] x_AL = total_diffs[1].*sin_scan_angle +  total_diffs[2].*cos_scan_angle;
         x_AL = x_AL + ast_noise;
         vector[5] obs_vals = gaia_params(T, x_AL, al_err, gaia_mat_AL);
         vector[5] y = [0,0,parallax,pmra,pmdec]';
         y ~ multi_normal(obs_vals,covar_matrix);
+        vector[T2] rv_sim = radial_velocity(T2, rv_t, a*dist/1000, q, l, P, cos_inclination, Omega, omega, t_peri);
+        rv_vals ~ multi_normal(rv_sim,diag_matrix(rv_errs.*rv_errs));
         real ruwe = sqrt(sum(pow(gaia_mat_AL*obs_vals-x_AL,2)/(pow(al_err,2)*(T-5))));//reduced_unit_weight_error(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri, sin_scan_angle, cos_scan_angle, al_err, ACAT);
         ruwe_obs ~ normal(ruwe, ruwe_err);
         //real mag_sim = mag_from_mass(m1,bright*m2,plx_real);
         //g_mag ~ normal(mag_sim, mag_err);
-        real mag_sim = mag_from_mass_single(m1,plx_real);
-        g_mag ~ normal(mag_sim, mag_err);
     }
 }
 
@@ -773,14 +736,14 @@ generated quantities {
 	vector[5] stan_params;
 	{
 		vector[T] gaia_diffs[2] = gaia_pos(T, ra_real, dec_real, plx_real, pmra_real, pmdec_real, gaia_mat);
-		vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri);
+		vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, cos_inclination, Omega, omega, t_peri);
         vector[T] x_AL = total_diffs[1].*sin_scan_angle +  total_diffs[2].*cos_scan_angle;
 		stan_params = gaia_params(T, x_AL, al_err, gaia_mat_AL);
 	}
     real ruwe;
     {
         vector[T] gaia_diffs[2] = gaia_pos(T, ra_real, dec_real, plx_real, pmra_real, pmdec_real, gaia_mat);
-		vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri);
+		vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, cos_inclination, Omega, omega, t_peri);
         vector[T] x_AL = total_diffs[1].*sin_scan_angle +  total_diffs[2].*cos_scan_angle;
         x_AL = x_AL + ast_noise;
         vector[5] obs_vals = gaia_params(T, x_AL, al_err, gaia_mat_AL);
@@ -796,20 +759,20 @@ generated quantities {
     }
     vector[T] anomaly;
     {
-    	anomaly = true_anomaly_calc(T, t, P, e, t_peri);
+    	anomaly = true_anomaly_calc(T, t, P, t_peri);
     }
     array[2] vector[T] pos;
     {
-    	pos = source_position(T, t, a, P, q, l, e, cos_inclination, Omega, omega, t_peri);
+    	pos = source_position(T, t, a, P, q, l, cos_inclination, Omega, omega, t_peri);
     }
     array[2] vector[T] pos2d;
      {
-     	pos2d = projected_position_2d(T, t, a, P, e, cos_inclination, Omega, omega, t_peri);
+     	pos2d = projected_position_2d(T, t, a, P, cos_inclination, Omega, omega, t_peri);
      }
     array[2] vector[T] pos_tot;
     {
     	vector[T] diffs[2] = gaia_pos(T, ra_real, dec_real, plx_real, pmra_real, pmdec_real, gaia_mat);
-    	pos_tot = system_pos(T, t, diffs[1], diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri);
+    	pos_tot = system_pos(T, t, diffs[1], diffs[2], q, l, a, P, cos_inclination, Omega, omega, t_peri);
     }
     array[2] vector[T] pos_com;
     {
@@ -819,12 +782,12 @@ generated quantities {
     }
     array[2] real pos_init;
     {
-    	pos_init = initial_position(a, P, q, l, e, cos_inclination, Omega, omega, t_peri);
+    	pos_init = initial_position(a, P, q, l, cos_inclination, Omega, omega, t_peri);
     }
     vector[5] stan_obs;
     {
         vector[T] gaia_diffs[2] = gaia_pos(T, ra_real, dec_real, plx_real, pmra_real, pmdec_real, gaia_mat);
-    	vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, e, cos_inclination, Omega, omega, t_peri);
+    	vector[T] total_diffs[2] = system_pos(T, t, gaia_diffs[1], gaia_diffs[2], q, l, a, P, cos_inclination, Omega, omega, t_peri);
         stan_obs = gaia_obs(T, sin_scan_angle, cos_scan_angle, total_diffs[1], total_diffs[2], inv_gaia);
     }
 }"""
@@ -850,6 +813,7 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 	abs_mag = g_mag-5*np.log10(100./plx_obs)
 	m1_mean = 10**((4.83-abs_mag)/10)
 	ast_noise = ast_error*np.random.randn(len(t_obs))
+	rv_errs = 0.01*np.ones(rv_data.shape[0])
 	data = {
 		"ra": ra, 
 		"dec": dec, 
@@ -871,6 +835,10 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 		"m1_mean": m1_mean,
 		"g_mag": g_mag,
 		"mag_err": 0.05,
+		"rv_vals": rv_data[:,1],
+		"rv_t": rv_data[:,0]-2016,
+		"T2": rv_data.shape[0],
+		"rv_errs": rv_errs,
 	}
 	model = stan.build(program_code, data=data)
 	return model

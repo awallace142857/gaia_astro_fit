@@ -726,8 +726,8 @@ transformed data {
     vector[T] cos_scan_angle = cos(scan_angle);
 }
 parameters {
-    real<lower=0.08, upper=3> m1; // solar masses
-    real<lower=0.002, upper=m2_max> m2; // solar masses
+    //real<lower=0.08, upper=3> m1; // solar masses
+    real<lower=0.002, upper=m1_mean> m2; // solar masses
     real<lower=0.1, upper=40> P;
     real<lower=0.0, upper=0.8> e;
     real initial_phase;
@@ -742,14 +742,15 @@ parameters {
     
 }
 transformed parameters {
+	real m1 = m1_mean;
 	real q = m2/m1;
 	real dist = 1000./plx_real;
 	real a = 1000 * pow((m1+m2)*pow(P, 2), 1./3) / dist;
-	real l = pow(q,4);
+	real l = 0;
 	real t_peri = -initial_phase * P / (2*pi());
 }
 model {
-    m1 ~ normal(m1_mean, 0.2);
+    //m1 ~ normal(m1_mean, 0.2);
     {
         real a0 = a*(q/(1+q)-l/(1+l)); // l = 0 for a dark companion
         real a1 = a*(q/(1+q));
@@ -764,8 +765,6 @@ model {
         ruwe_obs ~ normal(ruwe, ruwe_err);
         //real mag_sim = mag_from_mass(m1,bright*m2,plx_real);
         //g_mag ~ normal(mag_sim, mag_err);
-        real mag_sim = mag_from_mass_single(m1,plx_real);
-        g_mag ~ normal(mag_sim, mag_err);
     }
 }
 
