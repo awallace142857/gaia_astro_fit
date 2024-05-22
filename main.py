@@ -13,7 +13,7 @@ import sys,pickle
 import astromet
 import csv
 import os
-import ruwe_ecc,ruwe_circ,rv_ecc,rv_circ,im_ecc,im_circ
+from stan_codes import ruwe_ecc,ruwe_circ,rv_ecc,rv_circ,im_ecc,im_circ,ruwe_ecc_dark,ruwe_circ_dark,rv_ecc_dark,rv_circ_dark,im_ecc_dark,im_circ_dark
 import stan
 from astroquery.gaia import Gaia
 from astroquery.simbad import Simbad
@@ -35,7 +35,7 @@ def find_obs(ra,dec):
 		g = x*np.cos(ra*np.pi/180)*np.sin(dec*np.pi/180)+y*np.sin(ra*np.pi/180)*np.sin(dec*np.pi/180)-z*np.cos(dec*np.pi/180)
 		p_factors[ii] = f*np.sin(angs[ii])+g*np.cos(angs[ii])
 	return (ts,angs,p_factors)
-    
+
 def convert_julian_date(j_date):
 	return j_date/365.25-4712
 	
@@ -469,10 +469,19 @@ def gaia_query(source_id):
 	return (params,t_obs,scan_angle,plx_factor)
 
 def get_fitted_params(samples):
-    if 'e' in samples.constrained_param_names:
-        strings = ['m1','m2','P','e','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
-    else:
-        strings = ['m1','m2','P','cos_inclination','Omega','omega','t_peri','ra_real','dec_real','plx_real','pmra_real','pmdec_real','ruwe']
+    strings = []
+    all_names = samples.constrained_param_names
+    for ii in range(len(all_names)):
+        if '.' in all_names[ii]:
+            string = ''
+            for jj in range(len(all_names[ii])):
+                if all_names[ii][jj]=='.':
+                    break
+                string+=all_names[ii][jj]
+            if string not in strings:
+                strings.append(string)
+        else:
+            strings.append(all_names[ii])
     all_params = []
     if type(samples)==list:
         for ii in range(len(strings)):
@@ -481,7 +490,10 @@ def get_fitted_params(samples):
             elif 'mega' in strings[ii]:
                 all_params.append(list((samples[0].get(strings[ii])[0]*180/np.pi)%360))
             else:
-                all_params.append(list(samples[0].get(strings[ii])[0]))
+                if len(samples[0].get(strings[ii]))==1:
+                    all_params.append(list(samples[0].get(strings[ii])[0]))
+                else:
+                    all_params.append(list(samples[0].get(strings[ii])))
         for jj in range(1,len(samples)):
             for ii in range(len(strings)):
                 if strings[ii]=='cos_inclination':
@@ -489,7 +501,10 @@ def get_fitted_params(samples):
                 elif 'mega' in strings[ii]:
                     all_params[ii].extend(list((samples[jj].get(strings[ii])[0]*180/np.pi)%360))
                 else:
-                    all_params[ii].extend(list(samples[jj].get(strings[ii])[0]))
+                    if len(samples[jj].get(strings[ii]))==1:
+                        all_params[ii].extend(list(samples[jj].get(strings[ii])[0]))
+                    else:
+                        all_params[ii].extend(list(samples[jj].get(strings[ii])))
     else:
         for ii in range(len(strings)):
             if strings[ii]=='cos_inclination':
@@ -497,19 +512,41 @@ def get_fitted_params(samples):
             elif 'mega' in strings[ii]:
                 all_params.append((samples.get(strings[ii])[0]*180/np.pi)%360)
             else:
-                all_params.append(samples.get(strings[ii])[0])
-    return np.array(all_params)
+                if len(samples.get(strings[ii]))==1:
+                    all_params.append(samples.get(strings[ii])[0])
+                else:
+                    all_params.append(samples.get(strings[ii]))
+    return all_params
 
-def create_sample_dict(all_params):
+def create_sample_dict(samples,all_params):
+    labels = []
+    all_names = samples.constrained_param_names
+    for ii in range(len(all_names)):
+        change_names = ['cos_inclination','ra_real','dec_real','plx_real','pmra_real','pmdec_real']
+        new_names = ['inc','ra_off','dec_off','parallax','pmra','pmdec']
+        if all_names[ii] in change_names:
+        	el = change_names.index(all_names[ii])
+        	labels.append(new_names[el])
+        else:
+            if '.' in all_names[ii]:
+                string = ''
+                for jj in range(len(all_names[ii])):
+                    if all_names[ii][jj]=='.':
+                        break
+                    string+=all_names[ii][jj]
+                if string not in labels:
+                    labels.append(string)
+            else:
+                labels.append(all_names[ii])
     samples_dict = {}
-    labels = ['m1','m2','P','e','inc','Omega','omega','t_p','ra_off','dec_off','parallax','pmra','pmdec','ruwe']
-    if len(all_params)<len(labels):
-    	labels = ['m1','m2','P','inc','Omega','omega','t_p','ra_off','dec_off','parallax','pmra','pmdec','ruwe']
     for ii in range(len(all_params)):
         samples_dict[labels[ii]] = all_params[ii]
+    samples_dict['initial_phase'] = samples_dict['initial_phase']%(2*np.pi)
+    samples_dict['initial_phase'] = samples_dict['initial_phase']-2*np.pi*(samples_dict['initial_phase']>np.pi)
+    samples_dict['t_peri'] = -samples_dict['initial_phase']*samples_dict['P']/(2*np.pi)
     return samples_dict
     
-def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circular=False,image_data=None,rv_data=None):
+def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circular=False,image_data=None,rv_data=None,init=None):
 	(row,t_obs,scan_angle,plx_factor) = gaia_query(source_id)
 	gaia_params = [row['ra'],row['dec'],row['parallax'],row['pmra'],row['pmdec']]
 	gaia_errs = [row['ra_error'],row['dec_error'],row['parallax_error'],row['pmra_error'],row['pmdec_error']]
@@ -533,30 +570,101 @@ def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circula
 	#(t,scan_angle,plx_factor) = find_obs(ra,dec)
 	#pickle.dump((t,scan_angle,plx_factor),open('obs.pkl','wb'))
 	#sys.exit()
-	if circular:
-		if image_data is None and rv_data is None:
-			mod = ruwe_circ
-		elif rv_data is None:
-			mod = im_circ
+	if dark:
+		if circular:
+			if image_data is None and rv_data is None:
+				mod = ruwe_circ_dark
+			elif rv_data is None:
+				mod = im_circ_dark
+			else:
+				mod = rv_circ_dark
 		else:
-			mod = rv_circ
+			if image_data is None and rv_data is None:
+				mod = ruwe_ecc_dark
+			elif rv_data is None:
+				mod = im_ecc_dark
+			else:
+				mod = rv_ecc_dark
 	else:
-		if image_data is None and rv_data is None:
-			mod = ruwe_ecc
-		elif rv_data is None:
-			mod = im_ecc
+		if circular:
+			if image_data is None and rv_data is None:
+				mod = ruwe_circ
+			elif rv_data is None:
+				mod = im_circ
+			else:
+				mod = rv_circ
 		else:
-			mod = rv_ecc
+			if image_data is None and rv_data is None:
+				mod = ruwe_ecc
+			elif rv_data is None:
+				mod = im_ecc
+			else:
+				mod = rv_ecc
 	if ast_error=='auto':
 		err = float(astromet.sigma_ast(g_mag))
+		if np.isnan(err):
+			err = 0.4
 	else:
 		err = ast_error
-	model = mod.build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe_obs,0.02,t_obs,scan_angle,plx_factor,err,image_data,rv_data,dark)
-	samples = model.sample(num_chains=nChains, num_samples=nSamps)#,init=[{'m1':1,'m2':0.5,'P':0.8,'e':0.5,'t_peri':0,'cos_inclination':0.7,'Omega':270*np.pi/180,'omega':120*np.pi/180,'plx_real':3,'pmra_real':35,'pmdec_real':-20}])#,{'m1':1,'m2':10,'P':3,'initial_phase':0.0,'cos_inclination':0.7,'Omega':270*np.pi/180,'omega':120*np.pi/180},{'m1':1,'m2':10,'P':3,'initial_phase':0.0,'cos_inclination':0.7,'Omega':270*np.pi/180,'omega':120*np.pi/180},{'m1':1,'m2':10,'P':3,'initial_phase':0.0,'cos_inclination':0.7,'Omega':270*np.pi/180,'omega':120*np.pi/180}])
-	samples = create_sample_dict(get_fitted_params(samples))
+	model = mod.build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe_obs,0.1,t_obs,scan_angle,plx_factor,err,image_data,rv_data)
+	if init is None:
+		samples = model.sample(num_chains=nChains, num_samples=nSamps)
+	else:
+		samples = model.sample(num_chains=nChains, num_samples=nSamps,init=init)
+	samples = create_sample_dict(samples,get_fitted_params(samples))
 	return samples
 
-source_id = '5252617910656901632'
-err = 'auto'
-samples = run_stan(source_id,ast_error='auto',dark=True,circular=True)
-pickle.dump(samples,open('samples_'+source_id+'_'+str(err)+'.pkl','wb'))
+all_ids = pickle.load(open('bd_ids.pkl','rb'))
+counter = 0
+for source_id in all_ids:
+	"""if counter<2:
+		counter+=1
+		continue"""
+	samples = run_stan(source_id,ast_error='auto',dark=True,circular=True,init=[{'m2':0.02,'P':2}])
+	"""try:
+		samples = run_stan(source_id,ast_error='auto',dark=True,rv_result=True,m2_min=rv_masses[ii],e_rv=rv_es[ii])
+	except:
+		continue"""
+	pickle.dump(samples,open('samples_'+source_id+'.pkl','wb'))
+	#sys.exit()
+sys.exit()
+all_names = ['4 UMa',
+ '70 Vir',
+ '81 Cet',
+ 'HD 111591',
+ 'HD 125271',
+ 'HD 141937',
+ 'HD 158038',
+ 'HD 162020',
+ 'HD 66141',
+ 'HD 80883',
+ 'eps Tau',
+ 'mu Leo']
+
+rv_masses = [7.902, 7.416, 3.307, 4.4, 10.904, 9.69, 1.53, 9.84, 6.0, 5.5, 7.19, 2.4]
+rv_es = [0.453, 0.3988, 0.037, 0.26, 0.165, 0.41, 0.29, 0.28, 0.07, 0.203, 0.076, 0.09]
+short_names = []
+for ii in range(len(all_names)):
+	n = ''
+	for jj in range(len(all_names[ii])):
+		if not all_names[ii][jj]==' ':
+			n+=all_names[ii][jj]
+	short_names.append(n)
+for ii in range(len(all_names)):
+	name = all_names[ii]
+	if '141937' not in name:
+		continue
+	rv_data = pickle.load(open('rv_'+short_names[ii]+'.pkl','rb'))
+	result_table = Gaia.query_object(name,radius='10 arcsecond')
+	gaia_name = result_table['DESIGNATION'].tolist()[0]
+	source_id = gaia_name[9:len(gaia_name)]
+	samples = run_stan(source_id,ast_error='auto',dark=True,rv_data=rv_data,init=[{'P':1.2}])
+	"""try:
+		samples = run_stan(source_id,ast_error='auto',dark=True,rv_result=True,m2_min=rv_masses[ii],e_rv=rv_es[ii])
+	except:
+		continue"""
+	pickle.dump(samples,open('samples_'+short_names[ii]+'.pkl','wb'))
+sys.exit()
+source_id = '2305829918153638400'
+samples = run_stan(source_id,ast_error='auto',dark=True)
+pickle.dump(samples,open('samples_'+source_id+'.pkl','wb'))
