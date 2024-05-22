@@ -613,58 +613,7 @@ def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circula
 		samples = model.sample(num_chains=nChains, num_samples=nSamps,init=init)
 	samples = create_sample_dict(samples,get_fitted_params(samples))
 	return samples
-
-all_ids = pickle.load(open('bd_ids.pkl','rb'))
-counter = 0
-for source_id in all_ids:
-	"""if counter<2:
-		counter+=1
-		continue"""
-	samples = run_stan(source_id,ast_error='auto',dark=True,circular=True,init=[{'m2':0.02,'P':2}])
-	"""try:
-		samples = run_stan(source_id,ast_error='auto',dark=True,rv_result=True,m2_min=rv_masses[ii],e_rv=rv_es[ii])
-	except:
-		continue"""
-	pickle.dump(samples,open('samples_'+source_id+'.pkl','wb'))
-	#sys.exit()
-sys.exit()
-all_names = ['4 UMa',
- '70 Vir',
- '81 Cet',
- 'HD 111591',
- 'HD 125271',
- 'HD 141937',
- 'HD 158038',
- 'HD 162020',
- 'HD 66141',
- 'HD 80883',
- 'eps Tau',
- 'mu Leo']
-
-rv_masses = [7.902, 7.416, 3.307, 4.4, 10.904, 9.69, 1.53, 9.84, 6.0, 5.5, 7.19, 2.4]
-rv_es = [0.453, 0.3988, 0.037, 0.26, 0.165, 0.41, 0.29, 0.28, 0.07, 0.203, 0.076, 0.09]
-short_names = []
-for ii in range(len(all_names)):
-	n = ''
-	for jj in range(len(all_names[ii])):
-		if not all_names[ii][jj]==' ':
-			n+=all_names[ii][jj]
-	short_names.append(n)
-for ii in range(len(all_names)):
-	name = all_names[ii]
-	if '141937' not in name:
-		continue
-	rv_data = pickle.load(open('rv_'+short_names[ii]+'.pkl','rb'))
-	result_table = Gaia.query_object(name,radius='10 arcsecond')
-	gaia_name = result_table['DESIGNATION'].tolist()[0]
-	source_id = gaia_name[9:len(gaia_name)]
-	samples = run_stan(source_id,ast_error='auto',dark=True,rv_data=rv_data,init=[{'P':1.2}])
-	"""try:
-		samples = run_stan(source_id,ast_error='auto',dark=True,rv_result=True,m2_min=rv_masses[ii],e_rv=rv_es[ii])
-	except:
-		continue"""
-	pickle.dump(samples,open('samples_'+short_names[ii]+'.pkl','wb'))
-sys.exit()
-source_id = '2305829918153638400'
+	
+source_id = '2305829918153638400' #Gaia source id or target name
 samples = run_stan(source_id,ast_error='auto',dark=True)
 pickle.dump(samples,open('samples_'+source_id+'.pkl','wb'))
