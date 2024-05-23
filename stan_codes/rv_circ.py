@@ -452,6 +452,14 @@ def best_chain(n_samples,n_chains,A,B,F,G,A_obs,B_obs,F_obs,G_obs):
 	diffs = np.array(diffs)
 	return diffs.argmin()
 
+def mass_from_mag(abs_mag):
+    m_sun = 4.83
+    m = 10**(0.25*(m_sun-abs_mag))
+    if m<0.43:
+        m = ((1./0.23)**(1./2.3))*10**((m_sun-abs_mag)/2.3)
+    elif m>2:
+        m = ((1./1.4)**(1./3.5))*10**((m_sun-abs_mag)/3.5)
+    return m
 program_code = """functions {
     real photocenter_scalar(real q, real l) {
         return abs(q - l)/((1 + l) * (1 + q));
@@ -809,7 +817,7 @@ def build_model(gaia_params,gaia_errs,gaia_corr,g_mag,ruwe,ruwe_err,t_obs,scan_a
 	gaia_mat_AL = gaia_matrix_AL(t_obs-2016,scan_angle,ra,dec)
 	inv_gaia = gaia_inverse_AL(t_obs-2016,scan_angle,ra,dec)
 	abs_mag = g_mag-5*np.log10(100./plx_obs)
-	m1_mean = 10**((4.83-abs_mag)/10)
+	m1_mean = mass_from_mag(abs_mag)
 	ast_noise = ast_error*np.random.randn(len(t_obs))
 	rv_errs = 0.01*np.ones(rv_data.shape[0])
 	data = {
