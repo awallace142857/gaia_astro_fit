@@ -546,7 +546,7 @@ def create_sample_dict(samples,all_params):
     samples_dict['t_peri'] = -samples_dict['initial_phase']*samples_dict['P']/(2*np.pi)
     return samples_dict
     
-def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circular=False,image_data=None,rv_data=None,init=None):
+def find_companion(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circular=False,image_data=None,rv_data=None,init=None):
 	(row,t_obs,scan_angle,plx_factor) = gaia_query(source_id)
 	gaia_params = [row['ra'],row['dec'],row['parallax'],row['pmra'],row['pmdec']]
 	gaia_errs = [row['ra_error'],row['dec_error'],row['parallax_error'],row['pmra_error'],row['pmdec_error']]
@@ -615,5 +615,5 @@ def run_stan(source_id,nSamps=4000,nChains=1,ast_error='auto',dark=False,circula
 	return samples
 	
 source_id = '2305829918153638400' #Gaia source id or target name
-samples = run_stan(source_id,ast_error='auto',dark=True)
+samples = find_companion(source_id,ast_error='auto',dark=True)
 pickle.dump(samples,open('samples_'+source_id+'.pkl','wb'))
