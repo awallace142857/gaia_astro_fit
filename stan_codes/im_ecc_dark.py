@@ -1,12 +1,6 @@
 import copy
 import logging
 import numpy as np,matplotlib.pyplot as plt
-import pandas as pd
-import healpy as hp
-from astropy import units as u
-from astropy import constants, coordinates, time
-from typing import Iterable, Optional, Tuple, Union
-from gaiaunlimited.utils import coord2healpix
 import scanninglaw,scanninglaw.times
 from astromet import sigma_ast
 import sys,pickle
