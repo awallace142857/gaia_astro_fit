@@ -3,9 +3,10 @@ Program using Bayesian inference with stan to constrain orbital parameters of po
 main.py contains code to run analysis on single source. <br />
 stan_codes contains models for specific cases depending on input. <br />
 
-Main function: find_companion <br />
+**Main function:** find_companion <br />
 Takes source_id as input (string of numbers) and from this, finds the observed position, parallax, proper motion, ruwe etc. <br />
-Optional inputs: <br />
+<br />
+**Optional inputs:** <br />
 nSamps: number of samples (default 4000) <br />
 ast_error: astrometric uncertainty (detault 'auto', ast_error taken from astromet.sigma_ast) <br />
 dark: whether the companion's brightness is negligible (default False) <br />
