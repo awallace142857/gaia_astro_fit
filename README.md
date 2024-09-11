@@ -11,7 +11,7 @@ ast_error: astrometric uncertainty (detault 'auto', ast_error taken from astrome
 dark: whether the companion's brightness is negligible (default False) <br />
 circular: are we assuming a circular orbit? (default False) <br />
 image_data: np array with position of companion with respect to primary (default None) <br />
-\t 1st column: time in years <br />
+&emsp; 1st column: time in years <br />
 \t 2nd column: ra offset in mas <br />
 \t 3rd column: dec offset in mas <br />
 rv_data: np array with radial velocity data (default None) <br />
