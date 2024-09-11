@@ -1,5 +1,8 @@
 Program to constrain orbital parameters of potential companions using Gaia astrometry and other methods.  Requires pystan version 3.9.0.
 
+main.py contains code to run analysis on single source
+stan_codes contains models for specific cases depending on input
+
 Main function: find_companion
 Takes source_id as input (string of numbers) and from this, finds the observed position, parallax, proper motion, ruwe etc.
 Optional inputs: 
