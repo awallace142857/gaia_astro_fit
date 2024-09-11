@@ -1,4 +1,4 @@
-Program to constrain orbital parameters of potential companions using Gaia astrometry and other methods.  Requires pystan version 3.9.0.
+Program using Bayesian inference with stan to constrain orbital parameters of potential companions using Gaia astrometry and other methods.  Requires pystan version 3.9.0.
 
 main.py contains code to run analysis on single source
 stan_codes contains models for specific cases depending on input
