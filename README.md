@@ -20,7 +20,7 @@ rv_data: np array with radial velocity data (default None) <br />
 &emsp; 2nd column: radial velocity in km/s <br />
 init: initial guess of parameters as a dictionary <br />
 <br />
-Returns: <br />
+**Returns:** <br />
 Posterior samples of: <br />
 masses <br />
 period <br />
