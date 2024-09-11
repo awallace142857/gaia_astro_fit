@@ -1,8 +1,6 @@
 import copy
 import logging
 import numpy as np,matplotlib.pyplot as plt
-from typing import Iterable, Optional, Tuple, Union
-from gaiaunlimited.utils import coord2healpix
 import scanninglaw,scanninglaw.times
 from astromet import sigma_ast
 import sys,pickle
