@@ -6,7 +6,7 @@ stan_codes contains models for specific cases depending on input
 Main function: find_companion
 Takes source_id as input (string of numbers) and from this, finds the observed position, parallax, proper motion, ruwe etc.
 Optional inputs: 
-nSamps: number of samples (default 4000)
+nSamps: number of samples (default 4000) 
 ast_error: astrometric uncertainty (detault 'auto', ast_error taken from astromet.sigma_ast)
 dark: whether the companion's brightness is negligible (default False)
 circular: are we assuming a circular orbit? (default False)
